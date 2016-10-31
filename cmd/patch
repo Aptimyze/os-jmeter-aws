@@ -1,0 +1,61 @@
+# Perform a yum update on all test ELK and JMeter instances
+
+function usage() {
+    cat <<-EOF
+
+    Perform a yum update on all test ELK and JMeter instances
+
+    Usage: $0 patch [options]
+     -h, --help                     displays this help message
+     -n, --name [NAME]              optional name of the test
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+typeset -i DELAY=5
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+source ${TEST_DIR}/elk
+source ${TEST_DIR}/jmeter
+
+for IP in ${ELK_PUBLIC_IP} ${JMETER_PUBLIC_IPS}; do
+    echo "Patching ${IP} ..."
+    ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no -t -t ec2-user@${IP} "sudo yum update -y; sudo shutdown -r now"
+done
+
+echo "All instances patched"

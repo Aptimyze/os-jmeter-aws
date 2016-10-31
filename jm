@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# Wrapper for JMeter test commands, holds common functions.
+
+TS=$(date '+%Y%m%d%H%M%S')
+SCRIPT_DIR=$(readlink -f $(dirname $0))
+CMD_DIR=${SCRIPT_DIR}/cmd
+RES_DIR=${SCRIPT_DIR}/resources
+BASE_DIR=$(pwd)
+TEST_NAME=
+TEST_DIR=
+DATA_DIR=
+LOG_DIR=
+WORK_DIR=
+
+# $@  - will all be logged
+function log() {
+    echo "[$(date '+%d/%m/%Y %H:%M:%S')]: $@"
+}
+
+# $1 - success code, anything non-zero causes script to exit
+# $2-n - will be logged as the error message
+function check() {
+    if (( $1 != 0 )); then
+        shift
+        log "ERROR - $@"
+        exit 1
+    fi
+}
+
+# $@ - error message
+function error() {
+    log "$@"
+    exit 1
+}
+
+# $1 - the test name
+# $2 - optional base directory
+function set-test-name() {
+    if [[ -z $1 ]]; then
+        error "You must provide a test name."
+    fi
+    TEST_NAME=$(echo "$1" | tr "[:upper:]" "[:lower:]" | tr "[:blank:]" '_')
+    if (( $# == 2 )); then
+        TEST_DIR=$2/${TEST_NAME}
+    else
+        TEST_DIR=${BASE_DIR}/${TEST_NAME}
+    fi
+    DATA_DIR=${TEST_DIR}/data
+    LOG_DIR=${TEST_DIR}/logs
+    WORK_DIR=${TEST_DIR}/work
+}
+
+function set-test-name-from-cwd() {
+    CWD=$(pwd)
+    set-test-name $(basename ${CWD}) $(dirname ${CWD})
+}
+
+# $1 - Instance Id
+function wait_for_instance() {
+    declare -i COUNT=0
+    while true; do
+        if (( $# == 0 )); then
+            break;
+        fi
+        INSTANCE_ID=${1}
+        shift
+        CMD="aws ec2 describe-instances --profile nf-test --instance-ids ${INSTANCE_ID} --query "Reservations[].Instances[].State.Name" --output text"
+        while true; do
+            RET=$(${CMD})
+            check $? "Error describing instance ${INSTANCE_ID}"
+            if [[ "running" == ${RET} ]]; then
+                break
+            fi
+            COUNT=${COUNT}+1
+            if (( ${COUNT} > 30 )); then
+                error "Instance ${INSTANCE_ID} not transitioned to running state after 5 minutes."
+            fi
+            sleep 10
+        done
+    done
+}
+
+# $1 - IPAddress
+# $2 - PEM key file
+function wait_for_instance_ssh() {
+    declare -i COUNT=0
+    CMD="ssh -i ${2} -t -t -oStrictHostKeyChecking=no ec2-user@${1} pwd"
+    while true; do
+        RET=$(${CMD})
+        if (( $? == 0 )); then
+            break
+        fi
+        COUNT=${COUNT}+1
+        if (( ${COUNT} > 30 )); then
+            error "Unable to ssh to Instance 5 minutes after reaching running state."
+        fi
+        sleep 10
+    done
+}
+
+function list_commands() {
+    echo ""
+    echo "This is a utility for performing JMeter tests run using resources procured from Amazon Web Services EC2."
+    echo "The following sub-commands are available:"
+    echo ""
+    S="                     "
+    for C in $(ls ${CMD_DIR}); do
+        D=$(head -1 ${CMD_DIR}/${C} | cut -d'#' -f2)
+        printf "\t%s %s %s\n" $C "${S:${#C}}" "$D"
+    done
+    echo ""
+    echo "Always start with 'jm new [test-name]'."
+    echo ""
+    echo "Typical workflow:"
+    echo -e "\tjm new [NAME]"
+    echo -e "\tcd [NAME]"
+    echo -e "\t## Edit and complete config file ##"
+    echo -e "\tjm verify"
+    echo -e "\tjm elk-up"
+    echo -e "\tjm jmeter-up --instance-count 5"
+    echo -e "\tjm patch"
+    echo -e "\tjm run-step-tests --delay-minutes 10 __OR__ jm run-tests"
+    echo -e "\tjm process-logs"
+    echo -e "\t## Run more tests and process logs ##"
+    echo -e "\t## Visit Kabana dashboard at http://ELK:8080/ ##"
+    echo -e "\tjm jmeter-terminate"
+    echo -e "\tjm elk-terminate"
+    echo ""
+    echo "Help can be obtained for any sub-command: jm [command] --help"
+    echo ""
+}
+
+CMD=$1
+
+if [[ -z ${CMD} || ${CMD,,} == "help" ]]; then
+    list_commands
+    exit 0
+fi
+
+CMD_FILE=${CMD_DIR}/${CMD}
+if [[ ! -r ${CMD_FILE} ]]; then
+    error "Not a valid command ${CMD}, script ${CMD_FILE} does not exist."
+fi
+
+source ${CMD_FILE}

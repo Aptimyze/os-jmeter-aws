@@ -1,0 +1,113 @@
+# Start all previously stopped instances of ELK and JMeter
+
+function usage() {
+    cat <<-EOF
+
+    Start all previously stopped instances of ELK and JMeter.
+
+    Usage: $0 jmeter-up [options]
+     -h, --help                     displays this help message
+     -n, --name [NAME]              optional name of the test
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+source ${TEST_DIR}/config
+
+if [[ -r ${TEST_DIR}/elk ]]; then
+    source ${TEST_DIR}/elk
+
+    if [[ ${ELK_PUBLIC_IP} ]]; then
+        error "Looks like ELK instance is still running"
+    fi
+fi
+
+if [[ -r ${TEST_DIR}/jmeter ]]; then
+    source ${TEST_DIR}/jmeter
+
+    if [[ ${JMETER_PUBLIC_IPS} ]]; then
+        error "Looks like JMeter instances are still running"
+    fi
+fi
+
+source ${CMD_DIR}/verify
+
+INSTANCES=$(echo ${ELK_ID} ${JMETER_IDS})
+
+if [[ ${INSTANCES} ]]; then
+    RET=$(aws ec2 --profile ${AWS_PROFILE} start-instances --instance-ids ${INSTANCES})
+    check $? "Starting stopped instances."
+fi
+
+wait_for_instance ${ELK_ID}
+
+# Determine instance IP Addresses and save in config file
+CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${ELK_ID}"
+RET=$(${CMD})
+check $? "Describing ELK instance"
+
+ELK_PRIVATE_IP=$(echo "${RET}" | jq -r '.Reservations[].Instances[].PrivateIpAddress')
+ELK_PUBLIC_IP=$(echo "${RET}" | jq -r '.Reservations[].Instances[].PublicIpAddress')
+
+echo "ELK_ID='${ELK_ID}'" > ${TEST_DIR}/elk
+echo "ELK_PRIVATE_IP='${ELK_PRIVATE_IP}'" >> ${TEST_DIR}/elk
+echo "ELK_PUBLIC_IP='${ELK_PUBLIC_IP}'" >> ${TEST_DIR}/elk
+
+wait_for_instance ${JMETER_IDS}
+
+# Determine instance IP Addresses and save in config file
+CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${JMETER_IDS}"
+RET=$(${CMD})
+check $? "Describing JMETER instances"
+
+T=$(echo ${RET} | jq -r '.Reservations[].Instances[].PublicIpAddress')
+JMETER_PUBLIC_IPS=$(echo $T)
+T=$(echo ${RET} | jq -r '.Reservations[].Instances[].PrivateIpAddress')
+JMETER_PRIVATE_IPS=$(echo $T)
+
+if [[ -z ${JMETER_PUBLIC_IPS} ]]; then
+    error "Unable to determine IP address of JMETER instances: ${JMETER_IDS}"
+fi
+
+echo "JMETER_IDS='${JMETER_IDS}'" > ${TEST_DIR}/jmeter
+echo "JMETER_PUBLIC_IPS='${JMETER_PUBLIC_IPS}'" >> ${TEST_DIR}/jmeter
+echo "JMETER_PRIVATE_IPS='${JMETER_PRIVATE_IPS}'" >> ${TEST_DIR}/jmeter
+
+echo ""
+echo "All instances are started!"
+echo ""

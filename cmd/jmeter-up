@@ -1,0 +1,131 @@
+# Launch and configure a specific number of JMeter instances
+
+function usage() {
+    cat <<-EOF
+
+    Launch and configure a specific number of JMeter instances.
+
+    Usage: $0 jmeter-up [options]
+     -h, --help                     displays this help message
+     -n, --name [NAME]              optional name of the test
+     -i, --instance-count [NUMBER]  optional number of instances to start, defaults to 1
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        -i|--instance-count)
+            COUNT=$2
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+if [[ -r ${TEST_DIR}/jmeter ]]; then
+    error "JMeter instances have already been created."
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+
+# Launch the instance(s)
+CMD="aws ec2 --profile ${AWS_PROFILE} run-instances --image-id ${AWS_AMI} --instance-type ${AWS_INSTANCE_TYPE} --key-name ${AWS_KEYPAIR} --security-groups ${AWS_SECURITY_GROUP} --count ${COUNT}"
+RET=$(${CMD})
+check $? "Starting JMeter instance(s)"
+echo ${RET} | jq -r . >> ${LOG_DIR}/jmeter-up.log
+T=$(echo ${RET} | jq -r '.Instances[].InstanceId')
+JMETER_IDS=$(echo $T)
+
+# Tag the instance(s)
+CMD="aws ec2 --profile ${AWS_PROFILE} create-tags --resources ${JMETER_IDS} --tags Key=Name,Value=${TEST_NAME}_JMETER"
+RET=$(${CMD})
+check $? "Tagging JMETER instance(s)"
+
+wait_for_instance ${JMETER_IDS}
+
+# Determine instance IP Addresses and save in config file
+CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${JMETER_IDS}"
+RET=$(${CMD})
+check $? "Describing JMETER instances"
+
+T=$(echo ${RET} | jq -r '.Reservations[].Instances[].PublicIpAddress')
+JMETER_PUBLIC_IPS=$(echo $T)
+T=$(echo ${RET} | jq -r '.Reservations[].Instances[].PrivateIpAddress')
+JMETER_PRIVATE_IPS=$(echo $T)
+
+if [[ -z ${JMETER_PUBLIC_IPS} ]]; then
+    error "Unable to determine IP address of JMETER instances: ${JMETER_IDS}"
+fi
+
+echo "JMETER_IDS='${JMETER_IDS}'" > ${TEST_DIR}/jmeter
+echo "JMETER_PUBLIC_IPS='${JMETER_PUBLIC_IPS}'" >> ${TEST_DIR}/jmeter
+echo "JMETER_PRIVATE_IPS='${JMETER_PRIVATE_IPS}'" >> ${TEST_DIR}/jmeter
+
+# Create bundle for JMETER
+cp ${RES_DIR}/jmeter/* ${WORK_DIR}/jmeter
+check $? "Copy resources into JMETER work directory"
+
+cp ${DATA_DIR}/*.jmx ${WORK_DIR}/jmeter
+check $? "Copy JMX file(s) from ${DATA_DIR} into JMETER work directory"
+
+if [[ ! -z ${P12_FILE} && -r ${DATA_DIR}/${P12_FILE} ]]; then
+    cp ${DATA_DIR}/${P12_FILE} ${WORK_DIR}/jmeter
+fi
+
+sed -i \
+ -e "s|%DOCKER_JMETER_IMAGE%|${DOCKER_JMETER}|g" \
+ -e "s|%P12_FILE%|${P12_FILE}|g" \
+ ${WORK_DIR}/jmeter/init.sh
+
+pushd ${WORK_DIR}/jmeter > /dev/null
+tar czf ${WORK_DIR}/${TEST_NAME}-jmeter.tgz ./*
+check $? "Creating tar file for transport to JMETER instance"
+popd > /dev/null
+
+for IP in ${JMETER_PUBLIC_IPS}; do
+    wait_for_instance_ssh ${IP} ${AWS_PEM}
+
+    # Copy bundle to JMETER
+    scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${WORK_DIR}/${TEST_NAME}-jmeter.tgz ec2-user@${IP}:~/${TEST_NAME}-jmeter.tgz
+    check $? "Sending tar file to JMETER instance ${IP}"
+
+    # Extract the bundle. Last command is background nohup one, must not use -t switch for ssh
+    ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "mkdir -p ./${TEST_NAME};tar xzf ${TEST_NAME}-jmeter.tgz -C ./${TEST_NAME}; chmod 755 ./${TEST_NAME}/*.sh; nohup ./${TEST_NAME}/init.sh  > ./${TEST_NAME}/init.log 2>&1 &"
+    check $? "Initialising the JMETER instance ${IP}"
+done
+
+echo "${COUNT} JMETER instance launched."
+echo "Private IPAddresses: ${JMETER_PRIVATE_IPS}"
+echo "Public IPAddresses: ${JMETER_PUBLIC_IPS}"
+echo ""

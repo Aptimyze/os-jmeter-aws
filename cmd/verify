@@ -1,0 +1,118 @@
+# Verify a test environment
+
+function usage() {
+    cat <<-EOF
+
+    Verify a test environment
+
+    Usage: $0 verify [options]
+     -h, --help                     displays this help message
+     -n, --name [NAME]              optional name of the test
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            echo ${USAGE}
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+source ${TEST_DIR}/config
+
+declare -a ERRORS
+
+ERRORS=()
+if [[ -z ${AWS_PROFILE} ]]; then
+    ERRORS+=("AWS_PROFILE must be set in config file.")
+fi
+
+if [[ ! -r ~/.aws/credentials ]]; then
+    ERRORS+=("AWS Credentials file ~/.aws/credentials not present")
+fi
+
+T=$(grep -q "\[${AWS_PROFILE}\]" ~/.aws/credentials)
+if (( $? != 0 )); then
+    ERRORS+=("AWS Profile '${AWS_PROFILE}' not defined in ~/.aws/credentials")
+fi
+
+if [[ -z ${JMX_FILE} ]]; then
+    ERRORS+=("JMX_FILE must be set in config file.")
+else
+    if [[ ! -f ${DATA_DIR}/${JMX_FILE} ]]; then
+        ERRORS+=("Test configuration ${JMX_FILE} specified in config, but not present in ${DATA_DIR}")
+    fi
+fi
+
+if [[ ! -z ${P12_FILE} ]]; then
+    if [[ ! -f ${DATA_DIR}/${P12_FILE} ]]; then
+        ERRORS+=("Certificate ${P12_FILE} specified in config, but not present in ${DATA_DIR}")
+    fi
+    if [[ -z ${P12_PASSWORD} ]]; then
+        ERRORS+=("Certificate specified in config, but no matching password provided: P12_PASSWORD")
+    fi
+fi
+
+if [[ -z ${AWS_AMI} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_AMI")
+fi
+if [[ -z ${AWS_INSTANCE_TYPE} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_INSTANCE_TYPE")
+fi
+if [[ -z ${AWS_KEYPAIR} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_KEYPAIR")
+fi
+if [[ -z ${AWS_PEM} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_PEM")
+fi
+if [[ ! -r ${AWS_PEM} ]]; then
+    ERRORS+=("PEM file does not exist: ${AWS_PEM}")
+fi
+if [[ -z ${AWS_SECURITY_GROUP} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_SECURITY_GROUP")
+fi
+
+if [[ -z ${DOCKER_ELK} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: DOCKER_ELK")
+fi
+if [[ -z ${DOCKER_JMETER} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: DOCKER_JMETER")
+fi
+
+if (( ${#ERRORS[@]} > 0 )); then
+    for ERM in "${ERRORS[@]}"; do
+        echo "ERROR: ${ERM}"
+    done
+    exit 1
+fi
+
+echo "Verified without errors."

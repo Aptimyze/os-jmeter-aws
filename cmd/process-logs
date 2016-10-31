@@ -1,0 +1,114 @@
+# Fetch logs from JMeter instances and feed to LogStash on ELK instance
+
+function usage() {
+    cat <<-EOF
+
+    Fetch logs from JMeter instances and feed to LogStash on ELK instance
+
+    Usage: $0 process-logs [options]
+     -h, --help             displays this help message
+     -n, --name [NAME]      optional name of the test
+     -k, --test-key [KEY]   optional key that identifies a test run, defaults to last test run
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+typeset -i COUNT=1
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        -k|--test-key)
+            TEST_KEY=$2
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+TEST_RUN_LOGS=${TEST_DIR}/test-runs.log
+PROCESSED_LOG=${TEST_DIR}/processed-runs.log
+
+if [[ -z ${TEST_KEY} ]]; then
+    if [[ ! -r ${TEST_RUN_LOGS} ]]; then
+        error "No test runs have been logged yet"
+    fi
+    TEST_KEY=$(tail -1 ${TEST_RUN_LOGS})
+    check $? "Unable to read last test key from ${TEST_RUN_LOGS}"
+
+    if [[ -z ${TEST_KEY} ]]; then
+        error "There was no last test run key in ${TEST_RUN_LOGS}"
+    fi
+fi
+
+if [[ -r ${PROCESSED_LOG} ]]; then
+    T=$(grep -q "^${TEST_KEY}$" ${PROCESSED_LOG})
+    if (( $? == 0 )); then
+        error "Test run '${TEST_KEY}' has already been processed"
+    fi
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+source ${TEST_DIR}/elk
+source ${TEST_DIR}/jmeter
+
+PROCESSED_LOG_SCRIPT_NAME=process-logs_${TEST_KEY}.sh
+PROCESSED_LOG_SCRIPT=${WORK_DIR}/process-logs_${TEST_KEY}.sh
+
+# Create a script to run on ELK that will fetch all of the test log files
+cp ${RES_DIR}/process-logs.sh ${PROCESSED_LOG_SCRIPT}
+check $? "Unable to create working copy of process logs script"
+
+chmod 755 ${PROCESSED_LOG_SCRIPT}
+check $? "Unable to make working copy of process logs script executable"
+
+# Substitute values for place holders in process logs script
+sed -i \
+ -e "s|%TEST_NAME%|${TEST_NAME}|" \
+ -e "s|%TEST_KEY%|${TEST_KEY}|" \
+ -e "s|%JMETER_INSTANCES%|${JMETER_PRIVATE_IPS}|" \
+ ${PROCESSED_LOG_SCRIPT}
+check $? "Unable to replace placeholders in working copy of process logs script"
+
+# Copy the file to ELK and execute it (as a background task?)
+CMD="nohup /home/ec2-user/${TEST_NAME}/work-dir/${PROCESSED_LOG_SCRIPT_NAME} > /home/ec2-user/${TEST_NAME}/log-dir/process-logs_${TEST_KEY}.log 2>&1 &"
+scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${PROCESSED_LOG_SCRIPT} ec2-user@${ELK_PUBLIC_IP}:/home/ec2-user/${TEST_NAME}/work-dir
+check $? "Problem copying process logs script to ELK instance ${ELK_PUBLIC_IP}"
+ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_PUBLIC_IP} "${CMD}"
+check $? "Problem launching process logs script on ELK instance ${ELK_PUBLIC_IP}"
+
+# Mark this test key as processed
+echo "${TEST_KEY}" >> ${PROCESSED_LOG}
+
+echo "Log loading is asynchronous and may take a few minutes."
+echo ""
+echo "Visit the Kebana dashboard at: http://${ELK_PUBLIC_IP}:8080/"
+echo ""

@@ -1,0 +1,54 @@
+{
+    "template": "logstash-jmeter-results-*",
+    "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 1,
+        "index.refresh_interval": "5s"
+    },
+    "mappings": {
+        "logs": {
+            "properties": {
+                "time": {
+                    "type": "date",
+                    "format": "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                },
+                "elapsed": {
+                    "type": "long"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "responseCode": {
+                    "type": "integer"
+                },
+                "threadName": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "bytes": {
+                    "type": "long"
+                },
+                "grpThreads": {
+                    "type": "long"
+                },
+                "allThreads": {
+                    "type": "long"
+                },
+                "Latency": {
+                    "type": "long"
+                },
+                "SampleCount": {
+                    "type": "long"
+                },
+                "ErrorCount": {
+                    "type": "long"
+                },
+                "Hostname": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

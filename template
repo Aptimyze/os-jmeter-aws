@@ -1,0 +1,51 @@
+
+# mandatory
+# The name of this test. Used to create working folders and temporary files.
+# This is populated by the new command
+TEST_NAME=
+
+# mandatory
+# Identify the AWS profile to use. This profile must be configured locally as
+# a "Named Profile", see the documentation here:
+# http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-multiple-profiles
+AWS_PROFILE=
+
+# mandatory
+# Name of the JMX that should be stored in the data directory. This will be the
+# script passed to the slave JMeters.
+JMX_FILE=
+
+# optional
+# Name of P12 server certificate used for 2 way mutual SSL. If present then the
+# file must exist in the data directory and there must be a password set.
+# The file will be copied to the JMeter slave instances.
+P12_FILE=
+P12_PASSWORD=
+
+# mandatory
+# The AMI to use for ELK and JMeter slaves. Must contain Docker
+# Should only require changing when the AMI is updated.
+AWS_AMI=ami-6a470c19
+AWS_INSTANCE_TYPE=m4.large
+
+# mandatory
+# This should be the name of the certificate PEM file used to access instances.
+# There is no way for script to check this, make sure up front.
+# The file should be located in ~/.ssh and have permissions 600 or stronger.
+AWS_KEYPAIR=JMeter-RDP
+AWS_PEM=~/.ssh/JMeter-RDP.pem
+
+# mandatory
+# What security group should be used for the instances.
+# The one defined below allows ssh and http access from OS and all access to itself
+AWS_SECURITY_GROUP=Jmeter-SSH
+
+# mandatory
+# The Docker image to use for launching an ELK stack
+# Should only require changing when the Docker image is updated
+DOCKER_ELK=sebp/elk:es240_l240_k460
+
+# mandatory
+# The Docker image to use for launching an ELK stack
+# Should only require changing when the Docker image is updated
+DOCKER_JMETER=ordnancesurvey/jmeter:v1.0

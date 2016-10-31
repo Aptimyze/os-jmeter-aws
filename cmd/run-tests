@@ -1,0 +1,125 @@
+# Run test on all JMeter instances simultaneously
+
+function usage() {
+    cat <<-EOF
+
+    Run test on all JMeter instances simultaneously. It is assumed that the test will be of a
+    limited duration and that JMeter will exit of its own accord.
+
+    Usage: $0 run-tests [options]
+     -h, --help                     displays this help message
+     -n, --name [NAME]              optional name of the test
+     -j, --jvm-args [ARGS]          optional JVM Args to pass to JMeter ("-Xms512m -Xmx2048m" etc.)
+     -f, --jmx-file [FILENAME]      optional name of JMX file to execute, file must already have been loaded on instances
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+JVM_ARGS=
+typeset -i COUNT=1
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        -j|--jvm-args)
+            JVM_ARGS=$2
+            shift
+            ;;
+        -f|--jmx-file)
+            SELECTED_JMX_FILE=$2
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+if [[ ! -z ${SELECTED_JMX_FILE} && ! -r ${DATA_DIR}/${SELECTED_JMX_FILE} ]]; then
+    error "The JMX file specified has not been added. Try jm add-jmx."
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+source ${TEST_DIR}/jmeter
+
+# Create the script that will be used to run JMeter inside Docker instance
+cp ${RES_DIR}/run.sh ${WORK_DIR}/run_${TS}.sh
+check $? "Unable to create working copy of run script"
+
+chmod 755 ${WORK_DIR}/run_${TS}.sh
+check $? "Unable to make working copy of run script executable"
+
+JMX_TO_USE=${SELECTED_JMX_FILE:=${JMX_FILE}}
+
+# Substitute values for place holders in run script
+sed -i \
+ -e "s|%TIMESTAMP%|${TS}|" \
+ -e "s|%JMX_FILE%|${JMX_TO_USE}|" \
+ -e "s|%TEST_NAME%|${TEST_NAME}|" \
+ -e "s|%P12_FILE%|${P12_FILE}|" \
+ ${WORK_DIR}/run_${TS}.sh
+check $? "Unable to replace placeholders in working copy of run script"
+
+PWD=""
+if [[ ! -z ${P12_PASSWORD} ]]; then
+    PWD="-e 'P12PWD=${P12_PASSWORD}'"
+fi
+
+JVMARGS=""
+if [[ ${JVM_ARGS} ]]; then
+    JVMARGS="-e 'JVM_ARGS=${JVM_ARGS}'"
+fi
+
+## At this point we have a conflict, we cannot Docker run with both -d and --rm!
+## We really, really want --rm, so we have to settle for running docker in the
+## background.
+
+CMD="nohup docker run --rm \
+${PWD} \
+${JVMARGS} \
+-v /home/ec2-user/${TEST_NAME}/log-dir:/logs \
+-v /home/ec2-user/${TEST_NAME}/data-dir:/input_data \
+-v /home/ec2-user/${TEST_NAME}/conf-dir:/jmconf \
+--entrypoint '/input_data/run_${TS}.sh' \
+ordnancesurvey/jmeter:v1.0 > /home/ec2-user/${TEST_NAME}/log-dir/${TS}-docker.log 2>&1 &\
+"
+
+# Copy the file to all of the JMeter servers and start it running
+for IP in ${JMETER_PUBLIC_IPS}; do
+    scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${WORK_DIR}/run_${TS}.sh ec2-user@${IP}:/home/ec2-user/${TEST_NAME}/data-dir
+    check $? "Problem copying run script to ${IP}"
+    ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "${CMD}"
+    check $? "Problem launching Docker JMeter on ${IP}"
+done
+
+# Make a record of this test run
+echo ${TS} >> ${TEST_DIR}/test-runs.log
+
+echo "You can find a list of all test run keys in ${TEST_DIR}/test-runs.log"
+echo "The key for this test is: ${TS}"

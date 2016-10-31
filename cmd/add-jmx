@@ -1,0 +1,86 @@
+# Add a JMX file to the test. If there are running instances then upload the file to them as well.
+
+function usage() {
+    cat <<-EOF
+
+    Add a JMX file to the test. If there are running instances then upload the file to them as well.
+    This command can be used to make revised test profiles available once a test is in use. It can be used
+    to load revised test plans or others that arise as a result of tests run so far.
+
+    Usage: $0 run-step-tests [options]
+     -h, --help                     displays this help message
+     -n, --name [NAME]              optional name of the test
+     -f, --jmx-file [FILENAME]      optional name of JMX file to execute
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+JVM_ARGS=
+typeset -i DELAY=5
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        -f|--jmx-file)
+            SELECTED_JMX_FILE=$2
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Convert minutes to seconds
+typeset -i DELAY_SECONDS=${DELAY}*60
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+if [[ ! -d ${DATA_DIR} ]]; then
+    error "Data directory '${DATA_DIR}' does not exist."
+fi
+
+if [[ -z ${SELECTED_JMX_FILE} ]]; then
+    error "You must specify a JMX file."
+fi
+
+if [[ ! -r ${SELECTED_JMX_FILE} ]]; then
+    error "JMX file '${SELECTED_JMX_FILE}' does not exist."
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+source ${TEST_DIR}/jmeter
+
+cp ${SELECTED_JMX_FILE} ${DATA_DIR}
+check $? "Copying ${SELECTED_JMX_FILE} to ${DATA_DIR}"
+
+if [[ ${JMETER_PUBLIC_IPS} ]]; then
+    for IP in ${JMETER_PUBLIC_IPS}; do
+        scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${SELECTED_JMX_FILE} ec2-user@${IP}:/home/ec2-user/${TEST_NAME}/data-dir
+        check $? "Copying file to JMeter instance ${IP}"
+    done
+fi

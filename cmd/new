@@ -1,0 +1,54 @@
+# Prepare a new local test environment
+
+function usage() {
+    cat <<-EOF
+
+    Prepare a new local test environment. A sub-directory is created in the current
+    working directory named after the test, see below for notes on how a test name
+    is cleaned up.
+
+    Once the new directory has been created make that the current working directory
+    before executing further commands.
+
+    Usage: $0 new [options]
+     -h, --help         displays this help message
+     -n, --name [NAME]  optional name of the test
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+if [[ -z ${TEST_NAME} ]]; then
+    error "You must provide a test name"
+fi
+
+if [[ -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' already exists."
+fi
+
+mkdir -p ${DATA_DIR} ${LOG_DIR} ${WORK_DIR}/elk ${WORK_DIR}/jmeter
+cp ${SCRIPT_DIR}/template ${TEST_DIR}/config
+sed -i "s|TEST_NAME=|TEST_NAME=${TEST_NAME}|" ${TEST_DIR}/config
+
+echo "You should cd ${TEST_DIR} now."

@@ -1,0 +1,113 @@
+# Launch and configure a new ELK instance for processing logs for a test
+
+function usage() {
+    cat <<-EOF
+
+    Launch and configure a new ELK instance for processing logs for a test
+
+    Usage: $0 elk-up [options]
+     -h, --help         displays this help message
+     -n, --name [NAME]  optional name of the test
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+EOF
+}
+
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+
+# Launch the instance
+CMD="aws ec2 --profile ${AWS_PROFILE} run-instances --image-id ${AWS_AMI} --instance-type ${AWS_INSTANCE_TYPE} --key-name ${AWS_KEYPAIR} --security-groups ${AWS_SECURITY_GROUP} --count 1"
+RET=$(${CMD})
+check $? "Starting ELK instance"
+echo ${RET} | jq -r . >> ${LOG_DIR}/elk-up.log
+ELK_ID=$(echo ${RET} | jq -r '.Instances[].InstanceId')
+# Tag the instance
+CMD="aws ec2 --profile ${AWS_PROFILE} create-tags --resources ${ELK_ID} --tags Key=Name,Value=${TEST_NAME}_ELK"
+RET=$(${CMD})
+check $? "Tagging ELK instance"
+
+wait_for_instance ${ELK_ID}
+
+# Determine instance IP Addresses and save in config file
+CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${ELK_ID}"
+RET=$(${CMD})
+check $? "Describing ELK instance"
+
+ELK_PRIVATE_IP=$(echo "${RET}" | jq -r '.Reservations[].Instances[].PrivateIpAddress')
+ELK_PUBLIC_IP=$(echo "${RET}" | jq -r '.Reservations[].Instances[].PublicIpAddress')
+
+echo "ELK_ID='${ELK_ID}'" > ${TEST_DIR}/elk
+echo "ELK_PRIVATE_IP='${ELK_PRIVATE_IP}'" >> ${TEST_DIR}/elk
+echo "ELK_PUBLIC_IP='${ELK_PUBLIC_IP}'" >> ${TEST_DIR}/elk
+
+# Create an SSL certificate for ELK to JMeter connections
+ssh-keygen -b 2048 -t rsa -q -f ${WORK_DIR}/elk_rsa -N ""
+check $? "Generating an SSH certificate for ELK instance"
+
+mv ${WORK_DIR}/elk_rsa ${WORK_DIR}/elk
+check $? "Move private key into ELK work directory"
+mv ${WORK_DIR}/elk_rsa.pub ${WORK_DIR}/jmeter
+check $? "Move public key into JMeter work directory"
+
+# Create bundle for ELK
+cp ${RES_DIR}/elk/* ${WORK_DIR}/elk
+check $? "Copy resources into ELK work directory"
+
+sed -i "s|DOCKER_ELK_IMAGE|${DOCKER_ELK}|g" ${WORK_DIR}/elk/init.sh
+
+pushd ${WORK_DIR}/elk > /dev/null
+tar czf ${WORK_DIR}/${TEST_NAME}-elk.tgz ./*
+check $? "Creating tar file for transport to ELK instance"
+popd > /dev/null
+
+wait_for_instance_ssh ${ELK_PUBLIC_IP} ${AWS_PEM}
+
+# Copy bundle to ELK
+scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${WORK_DIR}/${TEST_NAME}-elk.tgz ec2-user@${ELK_PUBLIC_IP}:~/${TEST_NAME}-elk.tgz
+check $? "Sending tar file to ELK instance"
+
+# Extract the bundle. Last command is background nohup one, must not use -t switch for ssh
+ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_PUBLIC_IP} "mkdir -p ./${TEST_NAME};tar xzf ${TEST_NAME}-elk.tgz -C ./${TEST_NAME}; chmod 755 ./${TEST_NAME}/*.sh; nohup ./${TEST_NAME}/init.sh  > ./${TEST_NAME}/init.log 2>&1 &"
+check $? "Initialising the ELK instance"
+
+echo "ELK instance launched."
+echo "Private IPAddress: ${ELK_PRIVATE_IP}"
+echo "Public IPAddress: ${ELK_PUBLIC_IP}"
+echo ""
+echo "Visit the Kebana dashboard at: http://${ELK_PUBLIC_IP}:8080/"
+echo ""
