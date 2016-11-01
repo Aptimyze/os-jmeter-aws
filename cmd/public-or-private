@@ -1,0 +1,13 @@
+# NOT A SUB-COMMAND
+#
+# Selects either public or private IP Addresses for use
+#
+# source ${CMD_DIR}/public-or-private
+
+if [[ -z ${USE_PRIVATE_IP} ]]; then
+    ELK_CURRENT_IP=${ELK_PUBLIC_IP}
+    JMETER_CURRENT_IPS=${JMETER_PUBLIC_IPS}
+else
+    ELK_CURRENT_IP=${ELK_PRIVATE_IP}
+    JMETER_CURRENT_IPS=${JMETER_PRIVATE_IPS}
+fi

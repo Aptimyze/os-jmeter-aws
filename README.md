@@ -189,6 +189,7 @@ jm ssh-jmeter
 or to connect to the third instance:
 
 ```
+
 jm ssh-jmeter --index 3
 ```
 

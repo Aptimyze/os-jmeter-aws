@@ -52,9 +52,10 @@ source ${CMD_DIR}/verify
 
 if [[ -r ${TEST_DIR}/elk ]]; then
     source ${TEST_DIR}/elk
+    source ${CMD_DIR}/public-or-private
 
-    if [[ ${ELK_PUBLIC_IP} ]]; then
-        for IP in ${ELK_PUBLIC_IP}; do
+    if [[ ${ELK_CURRENT_IP} ]]; then
+        for IP in ${ELK_CURRENT_IP}; do
             ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "rm -f /home/ec2-user/${TEST_NAME}/log-dir/*.csv"
         done
     fi
@@ -62,9 +63,10 @@ fi
 
 if [[ -r ${TEST_DIR}/jmeter ]]; then
     source ${TEST_DIR}/jmeter
+    source ${CMD_DIR}/public-or-private
 
-    if [[ ${JMETER_PUBLIC_IPS} ]]; then
-        for IP in ${JMETER_PUBLIC_IPS}; do
+    if [[ ${JMETER_CURRENT_IPS} ]]; then
+        for IP in ${JMETER_CURRENT_IPS}; do
             ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "rm -f /home/ec2-user/${TEST_NAME}/log-dir/*.log"
         done
     fi

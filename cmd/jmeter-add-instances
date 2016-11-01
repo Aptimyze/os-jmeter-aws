@@ -84,6 +84,8 @@ if [[ -z ${JMETER_PUBLIC_IPS} ]]; then
     error "Unable to determine IP address of JMETER instances: ${JMETER_IDS}"
 fi
 
+source ${CMD_DIR}/public-or-private
+
 # Create bundle for JMETER
 cp ${RES_DIR}/jmeter/* ${WORK_DIR}/jmeter
 check $? "Copy resources into JMETER work directory"
@@ -105,7 +107,7 @@ tar czf ${WORK_DIR}/${TEST_NAME}-jmeter.tgz ./*
 check $? "Creating tar file for transport to JMETER instance"
 popd > /dev/null
 
-for IP in ${JMETER_PUBLIC_IPS}; do
+for IP in ${JMETER_CURRENT_IPS}; do
     wait_for_instance_ssh ${IP} ${AWS_PEM}
 
     # Copy bundle to JMETER

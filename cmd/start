@@ -51,16 +51,18 @@ source ${TEST_DIR}/config
 
 if [[ -r ${TEST_DIR}/elk ]]; then
     source ${TEST_DIR}/elk
+    source ${CMD_DIR}/public-or-private
 
-    if [[ ${ELK_PUBLIC_IP} ]]; then
+    if [[ ${ELK_CURRENT_IP} ]]; then
         error "Looks like ELK instance is still running"
     fi
 fi
 
 if [[ -r ${TEST_DIR}/jmeter ]]; then
     source ${TEST_DIR}/jmeter
+    source ${CMD_DIR}/public-or-private
 
-    if [[ ${JMETER_PUBLIC_IPS} ]]; then
+    if [[ ${JMETER_CURRENT_IPS} ]]; then
         error "Looks like JMeter instances are still running"
     fi
 fi

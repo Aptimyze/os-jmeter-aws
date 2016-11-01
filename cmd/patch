@@ -53,7 +53,9 @@ source ${CMD_DIR}/verify
 source ${TEST_DIR}/elk
 source ${TEST_DIR}/jmeter
 
-for IP in ${ELK_PUBLIC_IP} ${JMETER_PUBLIC_IPS}; do
+source ${CMD_DIR}/public-or-private
+
+for IP in ${ELK_CURRENT_IP} ${JMETER_CURRENT_IPS}; do
     echo "Patching ${IP} ..."
     ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no -t -t ec2-user@${IP} "sudo yum update -y; sudo shutdown -r now"
 done

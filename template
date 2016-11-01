@@ -4,6 +4,13 @@
 # This is populated by the new command
 TEST_NAME=
 
+# optional
+# Determines if the running scripts should use public or private IP addresses
+# to communicate with the ELK and JMeter instances. This would be set to private
+# when running from a machine that exists in same VPC as ELK and JMetere instances
+# for example. Would always be public from a non-AWS machine.
+USE_PRIVATE_IP=
+
 # mandatory
 # Identify the AWS profile to use. This profile must be configured locally as
 # a "Named Profile", see the documentation here:
