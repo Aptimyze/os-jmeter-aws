@@ -131,9 +131,9 @@ You should then monitor the tests until completion before proceeding.
 The example below will let the tests run for 10 minutes before bringing another JMeter instance online. If there are 10 instances in play then the tests will run for a total of 100 minutes:
 
 ```
-jm run-step-tests --delay-minutes 10 --jvm-args "-Xms512m -Xmx2048m" --jmx-file wmts-100.jmx
+jm run-step-tests --delay-minutes 10 --run-time-minutes 60 --jvm-args "-Xms512m -Xmx2048m" --jmx-file wmts-100.jmx
 ```
-> Both --jvm-args and --jmx-file are optional, see help text for more information
+> All optional args shown, see help text for more information
 
 Once all JMeter instances have been brought into play the tests will run for the same interval and then all tests will be terminated.
 
