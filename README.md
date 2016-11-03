@@ -1,8 +1,8 @@
 # Overview
 
-A scripted approach to launching JMeter tests onto multiple instances and gathering the results into an ELK stack where dashboards can be used to analyse and visualise the results.
+A scripted approach to launching JMeter tests onto multiple Amazon EC2 instances and gathering the results into an [ELK](https://www.elastic.co/webinars/introduction-elk-stack) stack where dashboards can be used to analyse and visualise the results.
 
-This is an alterantive approach to using JMeter in Master / Slave mode which can lead to the Master becomming swamped with log traffic and to provide an alternative to JMeter for visualising the results.
+This is an alterantive approach to using JMeter in Master / Slave mode which can lead to the Master becomming swamped with log traffic and to provide an alternative to JMeter for visualising the results where there may be millions of log records.
 
 # Prerequisites
 The following are required on a machine that will be used to run these scripts:
@@ -17,6 +17,7 @@ There is a single _jm_ wrapper script that is used to drive all testing. It is c
 ```
 jm help
 ```
+
 Each sub-command is also capable of providing usage instructions by passing the _--help_ switch:
 
 ```
@@ -24,7 +25,11 @@ jm [sub-command] --help
 ```
 
 # A note about AWS environments
-These scripts that launch instances make use of an AWS Security Group. That security group should allow ssh connections between machines in the same security group, it should allow 8080 access from outside, specifically where you are running the tests from.
+The scripts that launch instances make use of an AWS Security Group (defined in a configuration file). That security group should allow ssh connections between machines in the same security group, it should allow 8080 access from outside, specifically where you are running the tests from.
+
+If you are going to use an AWS instance as the base for running tests and it is located in the same profile that instances will be started from then the scripts will need to be configured to use private IP Addresses.
+
+If you are going to use an AWS instance as the base for running tests and it is located in the some other AWS profile than that used to start instances from then the security group will have to be configured to allow access from the public IP Address of the base instance.
 
 # Process
 
@@ -57,8 +62,6 @@ All actions from this point on are covered by the provided scripts.
 First thing to do is create a new test environment:
 
 ```
-cd os-jmeter-aws/tests
-source ./source_me
 jm new --name "Some test name"
 ```
 
