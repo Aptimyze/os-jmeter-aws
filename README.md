@@ -23,6 +23,9 @@ Each sub-command is also capable of providing usage instructions by passing the 
 jm [sub-command] --help
 ```
 
+# A note about AWS environments
+These scripts that launch instances make use of an AWS Security Group. That security group should allow ssh connections between machines in the same security group, it should allow 8080 access from outside, specifically where you are running the tests from.
+
 # Process
 
 ## Overview
