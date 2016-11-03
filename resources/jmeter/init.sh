@@ -51,7 +51,7 @@ log "Waiting for Docker daemon to start"
 typeset -i MC=0
 while true; do
     typeset -i DC=$(ps -ef | grep "docker[ ]daemon" | wc -l)
-    if (( ${DC} < 3 )); then
+    if (( ${DC} > 0 )); then
         break
     fi
     MC=${MC}+1
