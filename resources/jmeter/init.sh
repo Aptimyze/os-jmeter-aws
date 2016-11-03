@@ -50,8 +50,8 @@ fi
 log "Waiting for Docker daemon to start"
 typeset -i MC=0
 while true; do
-    typeset -i DC=$(ps -ef | grep "docker[ ]daemon" | wc -l)
-    if (( ${DC} > 0 )); then
+    DC=$(docker ps)
+    if (( $? == 0 )); then
         break
     fi
     MC=${MC}+1
@@ -59,6 +59,7 @@ while true; do
         log "Docker service not started after 5 mins"
         exit 1
     fi
+    log ".. waiting for docker (${MC})"
     sleep 10
 done
 
