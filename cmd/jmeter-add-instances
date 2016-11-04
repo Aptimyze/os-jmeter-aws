@@ -68,7 +68,7 @@ CMD="aws ec2 --profile ${AWS_PROFILE} create-tags --resources ${JMETER_IDS} --ta
 RET=$(${CMD})
 check $? "Tagging JMETER instance(s)"
 
-wait_for_instance ${JMETER_IDS}
+wait_for_instance ${AWS_PROFILE} ${JMETER_IDS}
 
 # Determine instance IP Addresses and save in config file
 CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${JMETER_IDS}"

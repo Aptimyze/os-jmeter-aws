@@ -61,7 +61,7 @@ CMD="aws ec2 --profile ${AWS_PROFILE} create-tags --resources ${ELK_ID} --tags K
 RET=$(${CMD})
 check $? "Tagging ELK instance"
 
-wait_for_instance ${ELK_ID}
+wait_for_instance ${AWS_PROFILE} ${ELK_ID}
 
 # Determine instance IP Addresses and save in config file
 CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${ELK_ID}"

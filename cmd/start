@@ -76,7 +76,7 @@ if [[ ${INSTANCES} ]]; then
     check $? "Starting stopped instances."
 fi
 
-wait_for_instance ${ELK_ID}
+wait_for_instance ${AWS_PROFILE} ${ELK_ID}
 
 # Determine instance IP Addresses and save in config file
 CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${ELK_ID}"
@@ -90,7 +90,7 @@ echo "ELK_ID='${ELK_ID}'" > ${TEST_DIR}/elk
 echo "ELK_PRIVATE_IP='${ELK_PRIVATE_IP}'" >> ${TEST_DIR}/elk
 echo "ELK_PUBLIC_IP='${ELK_PUBLIC_IP}'" >> ${TEST_DIR}/elk
 
-wait_for_instance ${JMETER_IDS}
+wait_for_instance ${AWS_PROFILE} ${JMETER_IDS}
 
 # Determine instance IP Addresses and save in config file
 CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${JMETER_IDS}"
