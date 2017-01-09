@@ -1,0 +1,84 @@
+# Display status of tests running in background on all JMeter Instances
+
+function usage() {
+    cat <<-EOF
+
+    Display status of tests running in background on all JMeter Instances
+
+    Usage: $0 test-status [options]
+     -h, --help             displays this help message
+     -n, --name [NAME]      optional name of the test
+     -w, --wait             optional flag that causes script to wait until no tests running
+
+     The name of a test will be lower cased and all whitespace replaced with underscores.
+
+     If a script name is not provided the name of the current working directory will be used.
+
+     Eg. $0 test-status --wait
+EOF
+}
+
+typeset -i COUNT=1
+while (( $# > 0 )); do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--name)
+            set-test-name "$2"
+            shift
+            ;;
+        -w|--wait)
+            WAIT=true
+            ;;
+        *)
+            # Ignore or exit here
+        ;;
+    esac
+    shift
+done
+
+# Name is optional if script is being run from the test directory
+if [[ -z ${TEST_NAME} ]]; then
+    if [[ -r ./config ]]; then
+        set-test-name-from-cwd
+    else
+        error "You must provide a test name"
+    fi
+fi
+
+if [[ ! -d ${TEST_DIR} ]]; then
+    error "Test directory '${TEST_DIR}' does not exists."
+fi
+
+source ${TEST_DIR}/config
+source ${CMD_DIR}/verify
+
+if [[ -r ${TEST_DIR}/jmeter ]]; then
+    source ${TEST_DIR}/jmeter
+    source ${CMD_DIR}/public-or-private
+
+    if [[ ${JMETER_CURRENT_IPS} ]]; then
+      while true; do
+        declare -i ICOUNT=0
+        declare -i TCOUNT=0
+        for IP in ${JMETER_CURRENT_IPS}; do
+          ICOUNT=${ICOUNT}+1
+          COUNT=$(ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "docker ps | wc -l")
+          check $? "Unable to access JMeter instance ${IP}"
+          if (( ${COUNT} > 1 )); then
+            TCOUNT=${TCOUNT}+1
+          fi
+        done
+        echo ""
+        echo "Tests are running on ${TCOUNT} of ${ICOUNT} instances"
+        echo ""
+        if [[ -z ${WAIT} || ${TCOUNT} -eq 0 ]]; then
+          break
+        fi
+        sleep 30
+      done
+    fi
+fi
