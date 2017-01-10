@@ -101,7 +101,7 @@ check $? "Unable to replace placeholders in working copy of process logs script"
 
 # Copy the file to ELK and execute it (as a background task?)
 CMD="nohup /home/ec2-user/${TEST_NAME}/work-dir/${PROCESSED_LOG_SCRIPT_NAME} > /home/ec2-user/${TEST_NAME}/log-dir/process-logs_${TEST_KEY}.log 2>&1 &"
-scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${PROCESSED_LOG_SCRIPT} ec2-user@${ELK_CURRENT_IP}:/home/ec2-user/${TEST_NAME}/work-dir
+scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${RES_DIR}/fix-jmeter-errors.awk ${PROCESSED_LOG_SCRIPT} ec2-user@${ELK_CURRENT_IP}:/home/ec2-user/${TEST_NAME}/work-dir
 check $? "Problem copying process logs script to ELK instance ${ELK_CURRENT_IP}"
 ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_CURRENT_IP} "${CMD}"
 check $? "Problem launching process logs script on ELK instance ${ELK_CURRENT_IP}"

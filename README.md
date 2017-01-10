@@ -231,46 +231,62 @@ The jm wrapper provides the following summary:
 ```
 $ jm help
 
-This is a utility for performing JMeter tests run using resources procured from Amazon Web Services EC2.
+his is a utility for performing JMeter tests run using resources procured from Amazon Web Services EC2.
 The following sub-commands are available:
 
-        add-jmx                 Add a JMX file to the test. If there are running instances then upload the file to them as well.
-        clear-logs              Delete log files from all ELK and JMeter instances
-        elk-terminate           Terminate ELK instance started for a test
-        elk-up                  Launch and configure a new ELK instance for processing logs for a test
-        jmeter-add-instances    Launch more JMeter instances and configure for the test
-        jmeter-terminate        Terminate all JMeter instances started for a test
-        jmeter-up               Launch and configure a specific number of JMeter instances
-        new                     Prepare a new local test environment
-        patch                   Perform a yum update on all test ELK and JMeter instances
-        process-logs            Fetch logs from JMeter instances and feed to LogStash on ELK instance
-        run-step-tests          Run test on JMeter instances adding each instance to the mix after a delay
-        run-tests               Run test on all JMeter instances simultaneously
-        ssh-elk                 Open an interactive ssh session to ELK instance
-        ssh-jmeter              Open an interactive ssh session to a JMeter instance
-        start                   Start all previously stopped instances of ELK and JMeter
-        stop                    Stop all running instances of ELK and JMeter
-        verify                  Verify a test environment
+	add-jmx                 Add a JMX file to the test. If there are running instances then upload the file to them as well.
+	clear-logs              Delete log files from all ELK and JMeter instances
+	elk-terminate           Terminate ELK instance started for a test
+	elk-up                  Launch and configure a new ELK instance for processing logs for a test
+	jmeter-add-instances    Launch more JMeter instances and configure for the test
+	jmeter-terminate        Terminate all JMeter instances started for a test
+	jmeter-up               Launch and configure a specific number of JMeter instances
+	new                     Prepare a new local test environment
+	patch                   Perform a yum update on all test ELK and JMeter instances
+	process-logs            Fetch logs from JMeter instances and feed to LogStash on ELK instance
+	public-or-private       NOT A SUB-COMMAND
+	run-step-tests          Run test on JMeter instances adding each instance to the mix after a delay
+	run-tests               Run test on all JMeter instances simultaneously
+	ssh-elk                 Open an interactive ssh session to ELK instance
+	ssh-jmeter              Open an interactive ssh session to a JMeter instance
+	start                   Start all previously stopped instances of ELK and JMeter
+	stop                    Stop all running instances of ELK and JMeter
+	test-status             Display status of tests running in background on all JMeter Instances
+	verify                  Verify a test environment
+	wait-for-tests          Wait for all JMeter instances to stop running tests.
 
 Always start with 'jm new [test-name]'.
 
-Typical workflow:
-        jm new [NAME]
-        cd [NAME]
-        ## Edit and complete config file ##
-        jm verify
-        jm elk-up
-        jm jmeter-up --instance-count 5
-        jm patch
-        jm run-step-tests --delay-minutes 10 __OR__ jm run-tests
-        jm process-logs
-        ## Run more tests and process logs ##
-        ## Visit Kabana dashboard at http://ELK:8080/ ##
-        ## Add new tests scripts and run those: add-jmx ##
-        ## Stop all instances and take a break: stop ##
-        ## Restart all instances and run more tests: start ##
-        jm jmeter-terminate
-        jm elk-terminate
+Typical workflow - Run STEP tests, ramping up over time
+	jm new [NAME]
+	cd [NAME]
+	## Edit and complete config file ##
+	jm verify
+	jm elk-up
+	jm jmeter-up --instance-count 5
+	jm patch
+	jm run-step-tests --delay-minutes 10
+	jm process-logs
+	## Run more tests and process logs ##
+	## Visit Kabana dashboard at http://ELK:8080/ ##
+	jm jmeter-terminate
+	jm elk-terminate
+
+Typical workflow -  Background tests that self-terminate
+	jm new [NAME]
+	cd [NAME]
+	## Edit and complete config file ##
+	jm verify
+	jm elk-up
+	jm jmeter-up --instance-count 5
+	jm patch
+	jm run-tests
+	km test-status --wait
+	jm process-logs
+	## Run more tests and process logs ##
+	## Visit Kabana dashboard at http://ELK:8080/ ##
+	jm jmeter-terminate
+	jm elk-terminate
 
 Help can be obtained for any sub-command: jm [command] --help
 ```

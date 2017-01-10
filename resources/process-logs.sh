@@ -19,8 +19,8 @@ for IP in ${JMETER_INSTANCES}; do
     IPUL=$(echo ${IP} | tr '.' '_')
     LOCAL=$(tempfile)
     scp -i ~/${TEST_NAME}/elk_rsa -oStrictHostKeyChecking=no ec2-user@${IP}:~/${TEST_NAME}/log-dir/${TEST_NAME}_${TEST_KEY}.log ${LOCAL}
-    chmod 644 ${LOCAL}
-    mv ${LOCAL} ~/${TEST_NAME}/log-dir/${TEST_KEY}-${IPUL}.csv
+    cat ${LOCAL} | awk -f ${SCRIPT_DIR}/fix-jmeter-errors.awk > ~/${TEST_NAME}/log-dir/${TEST_KEY}-${IPUL}.csv
+    chmod 644 ~/${TEST_NAME}/log-dir/${TEST_KEY}-${IPUL}.csv
 done
 
 echo "Finished"
