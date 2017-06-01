@@ -1,11 +1,12 @@
-# Perform a yum update on all test ELK and JMeter instances
+# Wait for all JMeter instances to stop running tests.
 
 function usage() {
     cat <<-EOF
 
-    Perform a yum update on all test ELK and JMeter instances
+    JMeter is launched using a Docker image on each of the JMeter instances. This
+    script waits until there are no Docker instances running on the JMeter instances.
 
-    Usage: $0 patch [options]
+    Usage: $0 run-step-tests [options]
      -h, --help                     displays this help message
      -n, --name [NAME]              optional name of the test
 
@@ -16,7 +17,6 @@ function usage() {
 EOF
 }
 
-typeset -i DELAY=5
 while (( $# > 0 )); do
     key="$1"
     case $key in
@@ -50,14 +50,19 @@ fi
 
 source ${TEST_DIR}/config
 source ${CMD_DIR}/verify
-source ${TEST_DIR}/elk
 source ${TEST_DIR}/jmeter
-
 source ${CMD_DIR}/public-or-private
 
-for IP in ${ELK_CURRENT_IP} ${JMETER_CURRENT_IPS}; do
-    echo "Patching ${IP} ..."
-    ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no -t -t ec2-user@${IP} "sudo yum update -y; sudo shutdown -r now"
-done
-
-echo "All instances patched"
+if [[ ${JMETER_CURRENT_IPS} ]]; then
+    for IP in ${JMETER_CURRENT_IPS}; do
+        while true; do
+            DC=$(ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} 'docker ps | grep -i jmeter | wc -l')
+            check $? "Checking host ${IP}"
+            if (( ${DC} == 0 )); then
+                break
+            fi
+            echo "Still ${DC} docker processes running on ${IP}, sleeping for 30 seconds ..."
+            sleep 30
+        done
+    done
+fi

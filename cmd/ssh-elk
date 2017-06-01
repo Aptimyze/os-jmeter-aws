@@ -50,5 +50,6 @@ fi
 source ${TEST_DIR}/config
 source ${CMD_DIR}/verify
 source ${TEST_DIR}/elk
+source ${CMD_DIR}/public-or-private
 
-ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_PUBLIC_IP}
+ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_CURRENT_IP}

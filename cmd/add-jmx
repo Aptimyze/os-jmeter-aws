@@ -74,12 +74,13 @@ fi
 source ${TEST_DIR}/config
 source ${CMD_DIR}/verify
 source ${TEST_DIR}/jmeter
+source ${CMD_DIR}/public-or-private
 
 cp ${SELECTED_JMX_FILE} ${DATA_DIR}
 check $? "Copying ${SELECTED_JMX_FILE} to ${DATA_DIR}"
 
-if [[ ${JMETER_PUBLIC_IPS} ]]; then
-    for IP in ${JMETER_PUBLIC_IPS}; do
+if [[ ${JMETER_CURRENT_IPS} ]]; then
+    for IP in ${JMETER_CURRENT_IPS}; do
         scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${SELECTED_JMX_FILE} ec2-user@${IP}:/home/ec2-user/${TEST_NAME}/data-dir
         check $? "Copying file to JMeter instance ${IP}"
     done

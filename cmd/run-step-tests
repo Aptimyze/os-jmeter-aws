@@ -90,6 +90,7 @@ fi
 source ${TEST_DIR}/config
 source ${CMD_DIR}/verify
 source ${TEST_DIR}/jmeter
+source ${CMD_DIR}/public-or-private
 
 # Create the script that will be used to run JMeter inside Docker instance
 cp ${RES_DIR}/run.sh ${WORK_DIR}/run_${TS}.sh
@@ -135,7 +136,7 @@ ordnancesurvey/jmeter:v1.0 > /home/ec2-user/${TEST_NAME}/log-dir/${TS}-docker.lo
 "
 
 # Copy the file to all of the JMeter servers and start it running
-for IP in ${JMETER_PUBLIC_IPS}; do
+for IP in ${JMETER_CURRENT_IPS}; do
     scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${WORK_DIR}/run_${TS}.sh ec2-user@${IP}:/home/ec2-user/${TEST_NAME}/data-dir
     check $? "Problem copying run script to ${IP}"
     ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "${CMD}"
@@ -152,7 +153,7 @@ echo ${TS} >> ${TEST_DIR}/test-runs.log
 
 # Stop the Docker containers on all machines
 CMD="nohup docker stop ${TEST_NAME} >> /home/ec2-user/${TEST_NAME}/log-dir/${TS}-docker.log 2>&1 &"
-for IP in ${JMETER_PUBLIC_IPS}; do
+for IP in ${JMETER_CURRENT_IPS}; do
     ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${IP} "${CMD}"
     check $? "Problem terminating Docker JMeter on ${IP}"
 done

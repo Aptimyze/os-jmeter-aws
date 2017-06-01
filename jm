@@ -56,8 +56,14 @@ function set-test-name-from-cwd() {
     set-test-name $(basename ${CWD}) $(dirname ${CWD})
 }
 
-# $1 - Instance Id
+# $1 - AWS Profile
+# $2 - Instance Id
+# $3 - Instance Id
+# $4 - Instance Id
+# $N - Instance Id
 function wait_for_instance() {
+    AWS_PROFILE=${1}
+    shift
     declare -i COUNT=0
     while true; do
         if (( $# == 0 )); then
@@ -65,7 +71,7 @@ function wait_for_instance() {
         fi
         INSTANCE_ID=${1}
         shift
-        CMD="aws ec2 describe-instances --profile nf-test --instance-ids ${INSTANCE_ID} --query "Reservations[].Instances[].State.Name" --output text"
+        CMD="aws ec2 describe-instances --profile ${AWS_PROFILE} --instance-ids ${INSTANCE_ID} --query "Reservations[].Instances[].State.Name" --output text"
         while true; do
             RET=$(${CMD})
             check $? "Error describing instance ${INSTANCE_ID}"

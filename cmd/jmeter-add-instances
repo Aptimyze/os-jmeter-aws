@@ -68,7 +68,7 @@ CMD="aws ec2 --profile ${AWS_PROFILE} create-tags --resources ${JMETER_IDS} --ta
 RET=$(${CMD})
 check $? "Tagging JMETER instance(s)"
 
-wait_for_instance ${JMETER_IDS}
+wait_for_instance ${AWS_PROFILE} ${JMETER_IDS}
 
 # Determine instance IP Addresses and save in config file
 CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${JMETER_IDS}"
@@ -83,6 +83,8 @@ JMETER_PRIVATE_IPS=$(echo $T)
 if [[ -z ${JMETER_PUBLIC_IPS} ]]; then
     error "Unable to determine IP address of JMETER instances: ${JMETER_IDS}"
 fi
+
+source ${CMD_DIR}/public-or-private
 
 # Create bundle for JMETER
 cp ${RES_DIR}/jmeter/* ${WORK_DIR}/jmeter
@@ -105,7 +107,7 @@ tar czf ${WORK_DIR}/${TEST_NAME}-jmeter.tgz ./*
 check $? "Creating tar file for transport to JMETER instance"
 popd > /dev/null
 
-for IP in ${JMETER_PUBLIC_IPS}; do
+for IP in ${JMETER_CURRENT_IPS}; do
     wait_for_instance_ssh ${IP} ${AWS_PEM}
 
     # Copy bundle to JMETER
@@ -126,7 +128,11 @@ EXTRA_JMETER_IDS="${JMETER_IDS}"
 EXTRA_JMETER_PUBLIC_IPS="${JMETER_PUBLIC_IPS}"
 EXTRA_JMETER_PRIVATE_IPS="${JMETER_PRIVATE_IPS}"
 
-source ${TEST_DIR}/jmeter
+if [[ -r ${TEST_DIR}/jmeter ]]; then
+    source ${TEST_DIR}/jmeter
+else
+    unset JMETER_IDS JMETER_PUBLIC_IPS JMETER_PRIVATE_IPS
+fi
 
 echo "JMETER_IDS='${JMETER_IDS} ${EXTRA_JMETER_IDS}'" > ${TEST_DIR}/jmeter
 echo "JMETER_PUBLIC_IPS='${JMETER_PUBLIC_IPS} ${EXTRA_JMETER_PUBLIC_IPS}'" >> ${TEST_DIR}/jmeter

@@ -27,6 +27,22 @@ log "Move logstash config file into conf directory"
 mv ${SCRIPT_DIR}/99-jmeter.conf ${CONF_DIR}
 check $? "Move logstash config file into conf directory"
 
+log "Waiting for Docker daemon to start"
+typeset -i MC=0
+while true; do
+    DC=$(docker ps)
+    if (( $? == 0 )); then
+        break
+    fi
+    MC=${MC}+1
+    if (( ${MC} > 30 )); then
+        log "Docker service not started after 5 mins"
+        exit 1
+    fi
+    log ".. waiting for docker (${MC})"
+    sleep 10
+done
+
 log "Pulling docker image: DOCKER_ELK_IMAGE"
 docker pull DOCKER_ELK_IMAGE
 check $? "Pulling docker image: DOCKER_ELK_IMAGE"

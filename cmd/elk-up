@@ -61,7 +61,7 @@ CMD="aws ec2 --profile ${AWS_PROFILE} create-tags --resources ${ELK_ID} --tags K
 RET=$(${CMD})
 check $? "Tagging ELK instance"
 
-wait_for_instance ${ELK_ID}
+wait_for_instance ${AWS_PROFILE} ${ELK_ID}
 
 # Determine instance IP Addresses and save in config file
 CMD="aws ec2 --profile ${AWS_PROFILE} describe-instances --instance-ids ${ELK_ID}"
@@ -74,6 +74,8 @@ ELK_PUBLIC_IP=$(echo "${RET}" | jq -r '.Reservations[].Instances[].PublicIpAddre
 echo "ELK_ID='${ELK_ID}'" > ${TEST_DIR}/elk
 echo "ELK_PRIVATE_IP='${ELK_PRIVATE_IP}'" >> ${TEST_DIR}/elk
 echo "ELK_PUBLIC_IP='${ELK_PUBLIC_IP}'" >> ${TEST_DIR}/elk
+
+source ${CMD_DIR}/public-or-private
 
 # Create an SSL certificate for ELK to JMeter connections
 ssh-keygen -b 2048 -t rsa -q -f ${WORK_DIR}/elk_rsa -N ""
@@ -95,14 +97,14 @@ tar czf ${WORK_DIR}/${TEST_NAME}-elk.tgz ./*
 check $? "Creating tar file for transport to ELK instance"
 popd > /dev/null
 
-wait_for_instance_ssh ${ELK_PUBLIC_IP} ${AWS_PEM}
+wait_for_instance_ssh ${ELK_CURRENT_IP} ${AWS_PEM}
 
 # Copy bundle to ELK
-scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${WORK_DIR}/${TEST_NAME}-elk.tgz ec2-user@${ELK_PUBLIC_IP}:~/${TEST_NAME}-elk.tgz
+scp -i ${AWS_PEM} -oStrictHostKeyChecking=no ${WORK_DIR}/${TEST_NAME}-elk.tgz ec2-user@${ELK_CURRENT_IP}:~/${TEST_NAME}-elk.tgz
 check $? "Sending tar file to ELK instance"
 
 # Extract the bundle. Last command is background nohup one, must not use -t switch for ssh
-ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_PUBLIC_IP} "mkdir -p ./${TEST_NAME};tar xzf ${TEST_NAME}-elk.tgz -C ./${TEST_NAME}; chmod 755 ./${TEST_NAME}/*.sh; nohup ./${TEST_NAME}/init.sh  > ./${TEST_NAME}/init.log 2>&1 &"
+ssh -i ${AWS_PEM} -oStrictHostKeyChecking=no ec2-user@${ELK_CURRENT_IP} "mkdir -p ./${TEST_NAME};tar xzf ${TEST_NAME}-elk.tgz -C ./${TEST_NAME}; chmod 755 ./${TEST_NAME}/*.sh; nohup ./${TEST_NAME}/init.sh  > ./${TEST_NAME}/init.log 2>&1 &"
 check $? "Initialising the ELK instance"
 
 echo "ELK instance launched."

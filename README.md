@@ -1,8 +1,8 @@
 # Overview
 
-A scripted approach to launching JMeter tests onto multiple instances and gathering the results into an ELK stack where dashboards can be used to analyse and visualise the results.
+A scripted approach to launching JMeter tests onto multiple Amazon EC2 instances and gathering the results into an [ELK](https://www.elastic.co/webinars/introduction-elk-stack) stack where dashboards can be used to analyse and visualise the results.
 
-This is an alterantive approach to using JMeter in Master / Slave mode which can lead to the Master becomming swamped with log traffic and to provide an alternative to JMeter for visualising the results.
+This is an alterantive approach to using JMeter in Master / Slave mode which can lead to the Master becomming swamped with log traffic and to provide an alternative to JMeter for visualising the results where there may be millions of log records.
 
 # Prerequisites
 The following are required on a machine that will be used to run these scripts:
@@ -17,11 +17,19 @@ There is a single _jm_ wrapper script that is used to drive all testing. It is c
 ```
 jm help
 ```
+
 Each sub-command is also capable of providing usage instructions by passing the _--help_ switch:
 
 ```
 jm [sub-command] --help
 ```
+
+# A note about AWS environments
+The scripts that launch instances make use of an AWS Security Group (defined in a configuration file). That security group should allow ssh connections between machines in the same security group, it should allow 8080 access from outside, specifically where you are running the tests from.
+
+If you are going to use an AWS instance as the base for running tests and it is located in the same profile that instances will be started from then the scripts will need to be configured to use private IP Addresses.
+
+If you are going to use an AWS instance as the base for running tests and it is located in the some other AWS profile than that used to start instances from then the security group will have to be configured to allow access from the public IP Address of the base instance.
 
 # Process
 
@@ -54,8 +62,6 @@ All actions from this point on are covered by the provided scripts.
 First thing to do is create a new test environment:
 
 ```
-cd os-jmeter-aws/tests
-source ./source_me
 jm new --name "Some test name"
 ```
 
@@ -131,9 +137,9 @@ You should then monitor the tests until completion before proceeding.
 The example below will let the tests run for 10 minutes before bringing another JMeter instance online. If there are 10 instances in play then the tests will run for a total of 100 minutes:
 
 ```
-jm run-step-tests --delay-minutes 10 --jvm-args "-Xms512m -Xmx2048m" --jmx-file wmts-100.jmx
+jm run-step-tests --delay-minutes 10 --run-time-minutes 60 --jvm-args "-Xms512m -Xmx2048m" --jmx-file wmts-100.jmx
 ```
-> Both --jvm-args and --jmx-file are optional, see help text for more information
+> All optional args shown, see help text for more information
 
 Once all JMeter instances have been brought into play the tests will run for the same interval and then all tests will be terminated.
 
@@ -189,6 +195,7 @@ jm ssh-jmeter
 or to connect to the third instance:
 
 ```
+
 jm ssh-jmeter --index 3
 ```
 
@@ -224,46 +231,62 @@ The jm wrapper provides the following summary:
 ```
 $ jm help
 
-This is a utility for performing JMeter tests run using resources procured from Amazon Web Services EC2.
+his is a utility for performing JMeter tests run using resources procured from Amazon Web Services EC2.
 The following sub-commands are available:
 
-        add-jmx                 Add a JMX file to the test. If there are running instances then upload the file to them as well.
-        clear-logs              Delete log files from all ELK and JMeter instances
-        elk-terminate           Terminate ELK instance started for a test
-        elk-up                  Launch and configure a new ELK instance for processing logs for a test
-        jmeter-add-instances    Launch more JMeter instances and configure for the test
-        jmeter-terminate        Terminate all JMeter instances started for a test
-        jmeter-up               Launch and configure a specific number of JMeter instances
-        new                     Prepare a new local test environment
-        patch                   Perform a yum update on all test ELK and JMeter instances
-        process-logs            Fetch logs from JMeter instances and feed to LogStash on ELK instance
-        run-step-tests          Run test on JMeter instances adding each instance to the mix after a delay
-        run-tests               Run test on all JMeter instances simultaneously
-        ssh-elk                 Open an interactive ssh session to ELK instance
-        ssh-jmeter              Open an interactive ssh session to a JMeter instance
-        start                   Start all previously stopped instances of ELK and JMeter
-        stop                    Stop all running instances of ELK and JMeter
-        verify                  Verify a test environment
+	add-jmx                 Add a JMX file to the test. If there are running instances then upload the file to them as well.
+	clear-logs              Delete log files from all ELK and JMeter instances
+	elk-terminate           Terminate ELK instance started for a test
+	elk-up                  Launch and configure a new ELK instance for processing logs for a test
+	jmeter-add-instances    Launch more JMeter instances and configure for the test
+	jmeter-terminate        Terminate all JMeter instances started for a test
+	jmeter-up               Launch and configure a specific number of JMeter instances
+	new                     Prepare a new local test environment
+	patch                   Perform a yum update on all test ELK and JMeter instances
+	process-logs            Fetch logs from JMeter instances and feed to LogStash on ELK instance
+	public-or-private       NOT A SUB-COMMAND
+	run-step-tests          Run test on JMeter instances adding each instance to the mix after a delay
+	run-tests               Run test on all JMeter instances simultaneously
+	ssh-elk                 Open an interactive ssh session to ELK instance
+	ssh-jmeter              Open an interactive ssh session to a JMeter instance
+	start                   Start all previously stopped instances of ELK and JMeter
+	stop                    Stop all running instances of ELK and JMeter
+	test-status             Display status of tests running in background on all JMeter Instances
+	verify                  Verify a test environment
+	wait-for-tests          Wait for all JMeter instances to stop running tests.
 
 Always start with 'jm new [test-name]'.
 
-Typical workflow:
-        jm new [NAME]
-        cd [NAME]
-        ## Edit and complete config file ##
-        jm verify
-        jm elk-up
-        jm jmeter-up --instance-count 5
-        jm patch
-        jm run-step-tests --delay-minutes 10 __OR__ jm run-tests
-        jm process-logs
-        ## Run more tests and process logs ##
-        ## Visit Kabana dashboard at http://ELK:8080/ ##
-        ## Add new tests scripts and run those: add-jmx ##
-        ## Stop all instances and take a break: stop ##
-        ## Restart all instances and run more tests: start ##
-        jm jmeter-terminate
-        jm elk-terminate
+Typical workflow - Run STEP tests, ramping up over time
+	jm new [NAME]
+	cd [NAME]
+	## Edit and complete config file ##
+	jm verify
+	jm elk-up
+	jm jmeter-up --instance-count 5
+	jm patch
+	jm run-step-tests --delay-minutes 10
+	jm process-logs
+	## Run more tests and process logs ##
+	## Visit Kabana dashboard at http://ELK:8080/ ##
+	jm jmeter-terminate
+	jm elk-terminate
+
+Typical workflow -  Background tests that self-terminate
+	jm new [NAME]
+	cd [NAME]
+	## Edit and complete config file ##
+	jm verify
+	jm elk-up
+	jm jmeter-up --instance-count 5
+	jm patch
+	jm run-tests
+	km test-status --wait
+	jm process-logs
+	## Run more tests and process logs ##
+	## Visit Kabana dashboard at http://ELK:8080/ ##
+	jm jmeter-terminate
+	jm elk-terminate
 
 Help can be obtained for any sub-command: jm [command] --help
 ```

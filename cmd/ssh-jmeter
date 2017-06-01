@@ -56,8 +56,9 @@ fi
 source ${TEST_DIR}/config
 source ${CMD_DIR}/verify
 source ${TEST_DIR}/jmeter
+source ${CMD_DIR}/public-or-private
 
-AA=($JMETER_PUBLIC_IPS)
+AA=($JMETER_CURRENT_IPS)
 IP=${AA[$INDEX-1]}
 
 if [[ -z ${IP} ]]; then
