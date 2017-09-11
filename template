@@ -33,7 +33,11 @@ P12_PASSWORD=
 # The AMI to use for ELK and JMeter slaves. Must contain Docker
 # Should only require changing when the AMI is updated.
 AWS_AMI=ami-6a470c19
-AWS_INSTANCE_TYPE=m4.large
+
+# mandatory
+# The instance types to use for ELK and JMeter slaves.
+AWS_JMETER_INSTANCE_TYPE=m4.large
+AWS_ELK_INSTANCE_TYPE=m4.large
 
 # mandatory
 # This should be the name of the certificate PEM file used to access instances.
