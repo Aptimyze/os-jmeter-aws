@@ -85,8 +85,11 @@ fi
 if [[ -z ${AWS_AMI} ]]; then
     ERRORS+=("Mandatory parameter not defined in config file: AWS_AMI")
 fi
-if [[ -z ${AWS_INSTANCE_TYPE} ]]; then
-    ERRORS+=("Mandatory parameter not defined in config file: AWS_INSTANCE_TYPE")
+if [[ -z ${AWS_JMETER_INSTANCE_TYPE} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_JMETER_INSTANCE_TYPE")
+fi
+if [[ -z ${AWS_ELK_INSTANCE_TYPE} ]]; then
+    ERRORS+=("Mandatory parameter not defined in config file: AWS_ELK_INSTANCE_TYPE")
 fi
 if [[ -z ${AWS_KEYPAIR} ]]; then
     ERRORS+=("Mandatory parameter not defined in config file: AWS_KEYPAIR")

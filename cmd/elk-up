@@ -51,7 +51,7 @@ source ${TEST_DIR}/config
 source ${CMD_DIR}/verify
 
 # Launch the instance
-CMD="aws ec2 --profile ${AWS_PROFILE} run-instances --image-id ${AWS_AMI} --instance-type ${AWS_INSTANCE_TYPE} --key-name ${AWS_KEYPAIR} --security-groups ${AWS_SECURITY_GROUP} --count 1"
+CMD="aws ec2 --profile ${AWS_PROFILE} run-instances --image-id ${AWS_AMI} --instance-type ${AWS_ELK_INSTANCE_TYPE} --key-name ${AWS_KEYPAIR} --security-groups ${AWS_SECURITY_GROUP} --count 1"
 RET=$(${CMD})
 check $? "Starting ELK instance"
 echo ${RET} | jq -r . >> ${LOG_DIR}/elk-up.log
