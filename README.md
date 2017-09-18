@@ -208,6 +208,7 @@ Additionally this command can also be used to add any data files that may be use
 
 ```
 jm add-jmx --jmx-file ~/some/dir/rigorous.jmx
+jm add-jmx --jmx-file ~/some/dir/listedvalues.csv
 ```
 
 > Only run this script when all JMeter instances are running.
