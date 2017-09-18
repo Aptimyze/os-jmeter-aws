@@ -204,6 +204,7 @@ jm ssh-jmeter --index 3
 ## Add a new test JMX file to a test
 When you launch the JMeter instances all of the test JMX files are copied up to it. Once the instance is up you may find the need to provide a new test or modification to an existing test. This script provides the
 means to do that.
+Additionally this command can also be used to add any data files that may be used by your jmeter script. E.g. a CSV file that may contain a list of values used by jmeter's CSV Data Set Config Element.
 
 ```
 jm add-jmx --jmx-file ~/some/dir/rigorous.jmx
